@@ -57,7 +57,7 @@ st.set_page_config(
 def inject_styles():
     st.html(
         """<style>
-    .block-container { max-width: 100%; padding: 1.4rem 1.4rem 6.5rem; }
+    .block-container { max-width: 100%; padding-right: 1.4rem; padding-left: 1.4rem; padding-bottom: 3rem; }
     html, body, [data-testid="stAppViewContainer"] { background: #fafaf7; }
     .katex { font-size: 1.04em; }
     table { border-collapse: collapse; }
@@ -116,15 +116,15 @@ def inject_styles():
     .st-key-sb_active [data-testid="stVerticalBlock"] { }
 
     /* open-session button styled as plain text */
-    .st-key-sb_open button { border: none; background: transparent;
+    [class*="st-key-sb_open"] button { border: none; background: transparent;
                              box-shadow: none !important; text-align: left;
                              padding: .15rem .4rem; width: 100%; min-height: 0;
                              line-height: 1.3; border-radius: 6px; }
-    .st-key-sb_open button:hover { background: #f1f3f4; }
-    .st-key-sb_active .st-key-sb_open button { position: relative;
+    [class*="st-key-sb_open"] button:hover { background: #f1f3f4; }
+    .st-key-sb_active [class*="st-key-sb_open"] button { position: relative;
         background: #edf2fc; }
-    .st-key-sb_active .st-key-sb_open button:hover { background: #e3ecfb; }
-    .st-key-sb_active .st-key-sb_open button::before { content: "● ";
+    .st-key-sb_active [class*="st-key-sb_open"] button:hover { background: #e3ecfb; }
+    .st-key-sb_active [class*="st-key-sb_open"] button::before { content: "● ";
         color: #2563eb; font-weight: 700; }
     .pr-title { display: block; font-weight: 600; color: #1f2430;
                 font-size: .86rem; white-space: nowrap;
@@ -133,12 +133,13 @@ def inject_styles():
                white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
     /* compact action button */
-    .st-key-sb_actions button { min-width: 0; width: 100%; height: 26px; padding: 0;
+    [class*="st-key-sb_actions"] button { min-width: 0; width: 100%; height: 26px; padding: 0;
                                 border: none; background: transparent;
                                 box-shadow: none !important;
                                 display: flex; align-items: center;
                                 justify-content: center; }
-    .st-key-sb_actions button:hover { background: #eceef1; }
+    [class*="st-key-sb_actions"] button:hover { background: #eceef1; }
+    [class*="st-key-sb_actions"] [data-testid="stIconMaterial"],
     .st-key-sb_actions [data-testid="stIconMaterial"] { font-size: 1.15rem; }
 
     /* compact new-chat, search and subject */
@@ -681,7 +682,7 @@ with st.sidebar:
                             open_col, act_col = st.columns([6, 1], gap="small",
                                                            vertical_alignment="center")
                             with open_col:
-                                with st.container(key="sb_open"):
+                                with st.container(key=f"sb_open_{c['id']}"):
                                     if st.button(
                                         f'<span class="pr-title">{html.escape(_session_title(c))}</span>'
                                         f'<span class="pr-meta">{html.escape(_session_meta(c))}</span>',
@@ -694,7 +695,7 @@ with st.sidebar:
                                         st.session_state.notes_active = None
                                         st.session_state["prev_topic"] = None
                             with act_col:
-                                with st.container(key="sb_actions"):
+                                with st.container(key=f"sb_actions_{c['id']}"):
                                     with st.popover("", icon=":material/more_vert:",
                                                     key=f"more_{c['id']}"):
                                         if st.button("Pin" if not c["pinned"] else "Unpin",
