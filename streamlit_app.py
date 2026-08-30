@@ -98,6 +98,64 @@ def inject_styles():
     [data-testid="stVerticalBlockBorderWrapper"] { border-radius: 8px; }
     [data-testid="stChatMessage"] { padding-top: .35rem; padding-bottom: .35rem; }
     .stSectionFoot { display: none; }
+
+    /* ---- Study Sessions sidebar redesign ---- */
+    [data-testid="stSidebarContent"] { overflow-y: auto; }
+
+    /* Pinned header (title + new chat + search) and pinned account footer */
+    .st-key-sb_top { position: sticky; top: 0; z-index: 20; background: #ffffff;
+                     padding-bottom: .2rem; }
+    .st-key-sb_bottom { position: sticky; bottom: 0; z-index: 20;
+                        background: #ffffff; padding-top: .4rem; }
+
+    /* session list rows */
+    .st-key-sb_list { padding-top: .15rem; }
+    .st-key-sb_list [data-testid="stVerticalBlock"] { gap: .1rem; }
+
+    /* the row that is currently open */
+    .st-key-sb_active [data-testid="stVerticalBlock"] { }
+
+    /* open-session button styled as plain text */
+    .st-key-sb_open button { border: none; background: transparent;
+                             box-shadow: none !important; text-align: left;
+                             padding: .15rem .4rem; width: 100%; min-height: 0;
+                             line-height: 1.3; border-radius: 6px; }
+    .st-key-sb_open button:hover { background: #f1f3f4; }
+    .st-key-sb_active .st-key-sb_open button { position: relative;
+        background: #edf2fc; }
+    .st-key-sb_active .st-key-sb_open button:hover { background: #e3ecfb; }
+    .st-key-sb_active .st-key-sb_open button::before { content: "● ";
+        color: #2563eb; font-weight: 700; }
+    .pr-title { display: block; font-weight: 600; color: #1f2430;
+                font-size: .86rem; white-space: nowrap;
+                overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+    .pr-meta { display: block; color: #6b7280; font-size: .72rem;
+               white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+    /* compact action button */
+    .st-key-sb_actions button { min-width: 0; width: 100%; height: 26px; padding: 0;
+                                border: none; background: transparent;
+                                box-shadow: none !important;
+                                display: flex; align-items: center;
+                                justify-content: center; }
+    .st-key-sb_actions button:hover { background: #eceef1; }
+    .st-key-sb_actions [data-testid="stIconMaterial"] { font-size: 1.15rem; }
+
+    /* compact new-chat, search and subject */
+    .st-key-sb_newchat button { height: 32px; border-radius: 8px; }
+    .st-key-sb_search input { height: 32px; border-radius: 8px; }
+    .st-key-sb_subject [data-baseweb="select"] { height: 34px; border-radius: 8px; }
+    .st-key-sb_subject > div { margin-bottom: 0; }
+
+    /* compact group headers */
+    .sb-group { font-size: .66rem; font-weight: 700; letter-spacing: .05em;
+                color: #9aa0a6; text-transform: uppercase; margin: .5rem 0 .1rem .45rem; }
+
+    /* compact account / settings footer popover triggers */
+    .st-key-sb_bottom [data-testid="stBaseButton-secondary"] { height: 32px; }
+
+    /* blocked tooltips for ordinary rows; keep them tiny where they exist */
+    [data-testid="stSidebar"] [role="tooltip"] { max-width: 180px; white-space: normal; }
     </style>"""
     )
 
@@ -535,98 +593,157 @@ st.session_state.setdefault("current_conv", None)
 st.session_state.setdefault("viewing_doc", None)
 st.session_state.setdefault("notes_active", None)
 
+def _session_time(ts):
+    """Compact timestamp: '13:09' today, 'Mon' yesterday-ish, else '30 Aug'."""
+    from datetime import datetime
+
+    try:
+        dt = datetime.fromisoformat(ts)
+    except (TypeError, ValueError):
+        return ""
+    now = datetime.now()
+    today = now.replace(hour=0, minute=0, second=0, microsecond=0)
+    day = dt.replace(hour=0, minute=0, second=0, microsecond=0)
+    if day == today:
+        return dt.strftime("%H:%M")
+    if (today - day).days == 1:
+        return "Yest"
+    if (today - day).days < 7:
+        return dt.strftime("%a")
+    return dt.strftime("%d %b")
+
+
+def _session_title(c):
+    """Ellipsized one-line title for the session row."""
+    title = (c["title"] or "New Study Session").replace("\n", " ").strip()
+    if len(title) > 46:
+        title = title[:43].rstrip() + "…"
+    pin = "📌 " if c["pinned"] else ""
+    return pin + title
+
+
+def _session_meta(c):
+    parts = [f"{c['message_count']} msgs", f"{c['section_count']} nodes"]
+    t = _session_time(c["updated_at"])
+    if t:
+        parts.append(t)
+    return " · ".join(parts)
+
+
 with st.sidebar:
-    st.header("Study sessions")
+    # ---- FIXED HEADER ----
+    with st.container(key="sb_top"):
+        st.header("Study Sessions", help=None)
+        with st.container(key="sb_newchat"):
+            if st.button("＋  New chat", icon=":material/add_circle:", key="new_chat_top",
+                         width="stretch", use_container_width=True):
+                new_id = db.create_conversation(st.session_state.get("start_subject", "-"))
+                st.session_state.current_conv = new_id
+                st.session_state.viewing_doc = None
+                st.session_state.notes_active = None
+                st.rerun()
+        with st.container(key="sb_search"):
+            search = st.text_input("Search sessions…", placeholder="Search sessions…",
+                                   label_visibility="collapsed", key="search_chats")
+        with st.container(key="sb_subject"):
+            st.selectbox("Subject", SUBJECTS, index=0, key="start_subject",
+                         label_visibility="collapsed", help="Subject for new chat (study context).")
 
-    if st.button("+ New chat", icon=":material/add_circle:", key="new_chat_top"):
-        new_id = db.create_conversation(st.session_state.get("start_subject", "-"))
-        st.session_state.current_conv = new_id
-        st.session_state.viewing_doc = None
-        st.session_state.notes_active = None
-        st.rerun()
+    # ---- SCROLLABLE SESSION LIST ----
+    with st.container(key="sb_list"):
+        conversations = db.list_conversations()
+        if search:
+            needles = search.lower().split()
+            grouped_candidates = [(c, c["title"] + " " + (c["subject"] or "")) for c in conversations]
+            conversations = [c for c, hay in grouped_candidates
+                             if all(n in hay.lower() for n in needles)]
 
-    st.selectbox("Subject for new chat", SUBJECTS, index=0, key="start_subject",
-                 help="Stored on the conversation; used as study context.")
-
-    search = st.text_input("Search chats", placeholder="Search title or subject…",
-                           label_visibility="collapsed", key="search_chats")
-
-    conversations = db.list_conversations()
-    if search:
-        needles = [search.lower()]
-        conversations = [c for c in conversations
-                         if any(n in (c["title"] + " " + (c["subject"] or "")).lower() for n in needles)]
-
-    if not conversations:
-        st.caption("No sessions yet. Start a new chat above.")
-    else:
-        groups = {}
-        for c in conversations:
-            groups.setdefault(db.group_key(c["updated_at"]), []).append(c)
-        for gname, items in groups.items():
-            st.caption(gname)
-            for c in items:
-                with st.container(border=True, gap="small"):
-                    inner = st.container(horizontal=True)
-                    if inner.button(
-                        ("📌 " if c["pinned"] else "") + c["title"],
-                        key=f"sel_{c['id']}",
-                        width="stretch",
-                        help="Open this session",
-                    ):
-                        st.session_state.current_conv = c["id"]
-                        st.session_state.viewing_doc = None
-                        st.session_state.notes_active = None
-                        st.session_state["prev_topic"] = None
-                    with st.popover("", icon=":material/more_vert:", key=f"more_{c['id']}"):
-                        if st.button("Pin" if not c["pinned"] else "Unpin", key=f"pin_{c['id']}"):
-                            db.update_conversation(c["id"], pinned=not c["pinned"])
-                            st.rerun()
-                        if st.button("Duplicate", key=f"dup_{c['id']}"):
-                            db.duplicate_conversation(c["id"])
-                            st.rerun()
-                        new_title = st.text_input("Rename to", value=c["title"], key=f"rn_{c['id']}")
-                        if st.button("Save rename", key=f"rns_{c['id']}"):
-                            db.update_conversation(c["id"], title=new_title)
-                            st.rerun()
-                        if st.button("Delete", icon=":material/delete:", key=f"del_{c['id']}"):
-                            if st.session_state.current_conv == c["id"]:
-                                st.session_state.current_conv = None
-                                st.session_state.viewing_doc = None
-                                st.session_state.notes_active = None
-                            db.delete_conversation(c["id"])
-                            st.rerun()
-                    st.caption(
-                        f"{c['subject'] or 'General'} · {c['message_count']} msgs"
-                        f" · {c['section_count']} nodes · {c['updated_at'][5:16].replace('T', ' ')}"
+        if not conversations:
+            st.caption(("No sessions found." if search else "No sessions yet. Start a new chat above."))
+        else:
+            groups = {}
+            for c in conversations:
+                groups.setdefault(db.group_key(c["updated_at"]), []).append(c)
+            if search:
+                st.markdown('<div class="sb-group">Results</div>', unsafe_allow_html=True)
+            for gname, items in groups.items():
+                if not search:
+                    st.markdown(f'<div class="sb-group">{html.escape(gname)}</div>',
+                                unsafe_allow_html=True)
+                for c in items:
+                    is_active = (st.session_state.current_conv == c["id"])
+                    row_container = st.container(
+                        key="sb_active" if is_active else f"sb_{c['id']}", border=False
                     )
+                    with row_container:
+                        row = st.container(horizontal=True, gap="small")
+                        with row:
+                            open_col, act_col = st.columns([6, 1], gap="small",
+                                                           vertical_alignment="center")
+                            with open_col:
+                                with st.container(key="sb_open"):
+                                    if st.button(
+                                        f'<span class="pr-title">{html.escape(_session_title(c))}</span>'
+                                        f'<span class="pr-meta">{html.escape(_session_meta(c))}</span>',
+                                        key=f"sel_{c['id']}",
+                                        width="stretch",
+                                        type="tertiary",
+                                    ):
+                                        st.session_state.current_conv = c["id"]
+                                        st.session_state.viewing_doc = None
+                                        st.session_state.notes_active = None
+                                        st.session_state["prev_topic"] = None
+                            with act_col:
+                                with st.container(key="sb_actions"):
+                                    with st.popover("", icon=":material/more_vert:",
+                                                    key=f"more_{c['id']}"):
+                                        if st.button("Pin" if not c["pinned"] else "Unpin",
+                                                     key=f"pin_{c['id']}"):
+                                            db.update_conversation(c["id"], pinned=not c["pinned"])
+                                            st.rerun()
+                                        if st.button("Duplicate", key=f"dup_{c['id']}"):
+                                            db.duplicate_conversation(c["id"])
+                                            st.rerun()
+                                        new_title = st.text_input("Rename to", value=c["title"],
+                                                                  key=f"rn_{c['id']}")
+                                        if st.button("Save rename", key=f"rns_{c['id']}"):
+                                            db.update_conversation(c["id"], title=new_title)
+                                            st.rerun()
+                                        if st.button("Delete", icon=":material/delete:",
+                                                     key=f"del_{c['id']}"):
+                                            if st.session_state.current_conv == c["id"]:
+                                                st.session_state.current_conv = None
+                                                st.session_state.viewing_doc = None
+                                                st.session_state.notes_active = None
+                                            db.delete_conversation(c["id"])
+                                            st.rerun()
 
-    st.divider()
-    with st.popover("Settings", icon=":material/tune:", key="settings_pop"):
-        _model_ix = nim.NEMOTRON_MODELS.index(model) if model in nim.NEMOTRON_MODELS else 0
-        model = st.selectbox("Model", nim.NEMOTRON_MODELS, index=_model_ix, key="set_model")
-        thinking = st.checkbox("Enable reasoning (thinking)", value=thinking, key="set_thinking")
-        show_reasoning = st.checkbox("Show reasoning while streaming", value=show_reasoning, key="set_show_r")
-        verify_answers = st.checkbox("Verify answers (extra check, slower)", value=verify_answers, key="set_verify")
-        temperature = st.slider("Temperature", 0.0, 2.0, temperature, 0.05, key="set_temp")
-        max_tokens = st.slider("Max tokens", 256, 8192, max_tokens, 256, key="set_tokens")
-        system_prompt = st.text_area("System prompt", value=system_prompt,
-                                     height=180, key="set_system")
-        st.caption("Workspace")
-        st.session_state.notes_width = st.slider("Notes panel width (%)", 28, 60, notes_width, 2, key="set_nw",
-                                                 help="Keep notes comfortably wide; the chat column adjusts.")
-        st.session_state.notes_visible = st.checkbox("Show notes panel", value=notes_visible, key="set_nv")
-        st.session_state.panel_h = st.slider("Panel height (px)", 440, 900,
-                                             panel_h, 20, key="set_ph",
-                                             help="Height of the chat and notes scroll areas.")
-
-    st.divider()
-    with st.popover("Account", icon=":material/account_circle:", key="account_pop"):
-        st.markdown(f"**{st.session_state.get('user_name', 'User')}**")
-        st.caption(st.session_state.get("user_email", ""))
+    # ---- FIXED ACCOUNT FOOTER ----
+    with st.container(key="sb_bottom"):
         st.divider()
-        if st.button("Logout", icon=":material/logout:", key="logout_btn"):
-            logout()
+        with st.popover("Settings", icon=":material/tune:", key="settings_pop"):
+            _model_ix = nim.NEMOTRON_MODELS.index(model) if model in nim.NEMOTRON_MODELS else 0
+            model = st.selectbox("Model", nim.NEMOTRON_MODELS, index=_model_ix, key="set_model")
+            thinking = st.checkbox("Enable reasoning (thinking)", value=thinking, key="set_thinking")
+            show_reasoning = st.checkbox("Show reasoning while streaming", value=show_reasoning, key="set_show_r")
+            verify_answers = st.checkbox("Verify answers (extra check, slower)", value=verify_answers, key="set_verify")
+            temperature = st.slider("Temperature", 0.0, 2.0, temperature, 0.05, key="set_temp")
+            max_tokens = st.slider("Max tokens", 256, 8192, max_tokens, 256, key="set_tokens")
+            system_prompt = st.text_area("System prompt", value=system_prompt,
+                                         height=180, key="set_system")
+            st.caption("Workspace")
+            st.session_state.notes_width = st.slider("Notes panel width (%)", 28, 60, notes_width, 2, key="set_nw",
+                                                     help="Keep notes comfortably wide; the chat column adjusts.")
+            st.session_state.notes_visible = st.checkbox("Show notes panel", value=notes_visible, key="set_nv")
+            st.session_state.panel_h = st.slider("Panel height (px)", 440, 900,
+                                                 panel_h, 20, key="set_ph",
+                                                 help="Height of the chat and notes scroll areas.")
+        with st.popover("Account", icon=":material/account_circle:", key="account_pop"):
+            st.markdown(f"**{html.escape(st.session_state.get('user_name', 'User'))}**")
+            st.caption(st.session_state.get("user_email", ""))
+            st.divider()
+            if st.button("Logout", icon=":material/logout:", key="logout_btn"):
+                logout()
 
     db.save_user_settings(_uid, {
         "model": model,

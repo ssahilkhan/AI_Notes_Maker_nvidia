@@ -64,7 +64,7 @@ class TestLoginFlow:
         register_account(at, "Sahil", "sahil@example.com", "password123")
         assert is_logged_in(at)
         assert at.session_state["user_name"] == "Sahil"
-        assert any("Study sessions" in str(h.value) for h in at.sidebar.header)
+        assert any("study sessions" in str(h.value).lower() for h in at.header)
 
     def test_duplicate_registration_rejected(self):
         at1 = load_app()
