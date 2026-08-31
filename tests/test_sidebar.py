@@ -35,8 +35,8 @@ def register(at, email="side@example.com", name="Side", pw="password123"):
 
 
 def session_labels(at):
-    """Labels of the rendered session rows (title+meta HTML)."""
-    return [b.label for b in at.button if "<span class=\"pr-title\">" in str(b.label)]
+    """Labels of the rendered session-open buttons (key prefix sel_)."""
+    return [b.label for b in at.button if str(b.key).startswith("sel_")]
 
 
 class TestSidebarRendering:

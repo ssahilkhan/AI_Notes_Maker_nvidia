@@ -4,6 +4,8 @@ import tempfile
 import pytest
 from streamlit.testing.v1 import AppTest
 
+import core.db as db
+
 # Isolate the app under test to a throwaway database so tests never touch the
 # real data/study.db.
 _TEST_DB = os.path.join(tempfile.mkdtemp(prefix="study_app_test_"), "test.db")
@@ -141,3 +143,27 @@ class TestSettingsPersistence:
         assert is_logged_in(at2)
         slider2 = [s for s in at2.slider if s.label == "Temperature"][0]
         assert slider2.value == 1.7
+
+    def test_api_key_uses_shared_by_default_and_can_add_own(self):
+        at = load_app()
+        at.run()
+        register_account(at, "Alice", "apikey@example.com", "password123")
+        assert is_logged_in(at)
+
+        api_input = [t for t in at.text_input if t.label == "Your NVIDIA API key"][0]
+        assert api_input.value == ""
+
+        api_input.set_value("nvapi-user-abc").run()
+        assert at.session_state["set_api_key"] == "nvapi-user-abc"
+        assert db.get_user_settings(at.session_state["user_id"]).get("api_key") == "nvapi-user-abc"
+
+    def test_api_key_clearing_falls_back_to_shared(self):
+        at = load_app()
+        at.run()
+        register_account(at, "Alice", "apikey2@example.com", "password123")
+        api_input = [t for t in at.text_input if t.label == "Your NVIDIA API key"][0]
+        api_input.set_value("nvapi-user-abc").run()
+
+        api_input.set_value("").run()
+        assert at.session_state["set_api_key"] == ""
+        assert db.get_user_settings(at.session_state["user_id"]).get("api_key") == ""

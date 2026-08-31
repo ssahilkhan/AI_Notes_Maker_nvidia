@@ -100,47 +100,53 @@ def inject_styles():
     .stSectionFoot { display: none; }
 
     /* ---- Study Sessions sidebar redesign ---- */
-    [data-testid="stSidebarContent"] { overflow-y: auto; }
-
-    /* Pinned header (title + new chat + search) and pinned account footer */
-    .st-key-sb_top { position: sticky; top: 0; z-index: 20; background: #ffffff;
-                     padding-bottom: .2rem; }
-    .st-key-sb_bottom { position: sticky; bottom: 0; z-index: 20;
-                        background: #ffffff; padding-top: .4rem; }
+    /* Sidebar body is a fixed column: pinned header + pinned account footer
+       wrap an independently scrollable session list. Streamlit nests the
+       sidebar content in inline wrappers (no stable classes), so the whole
+       chain is coerced into one flex column sized to the viewport. */
+    [data-testid="stSidebarContent"] { display: flex !important; flex-direction: column !important;
+                                       height: 100vh !important; overflow: hidden !important; }
+    [data-testid="stSidebarContent"] > :last-child { display: flex !important; flex-direction: column !important;
+                                                     min-height: 0 !important; height: 100% !important; }
+    [data-testid="stSidebarContent"] > :last-child > div { flex: 1 1 0% !important; min-height: 0 !important;
+                                                           height: auto !important; display: flex !important;
+                                                           flex-direction: column !important; }
+    [data-testid="stSidebarContent"] > :last-child > div > div.stVerticalBlock { min-height: 0 !important;
+                                                                                height: 100% !important;
+                                                                                overflow: hidden !important; }
+    [data-testid="stSidebarContent"] > :last-child > div > div.stVerticalBlock > div:has(> .st-key-sb_top),
+    [data-testid="stSidebarContent"] > :last-child > div > div.stVerticalBlock > div:has(> .st-key-sb_bottom) {
+        flex: 0 0 auto !important; }
+    [data-testid="stSidebarContent"] > :last-child > div > div.stVerticalBlock > div:has(> .st-key-sb_top) {
+        padding-bottom: .2rem; background: #ffffff; }
+    [data-testid="stSidebarContent"] > :last-child > div > div.stVerticalBlock > div:has(> .st-key-sb_bottom) {
+        padding-top: .4rem; background: #ffffff; }
+    [data-testid="stSidebarContent"] > :last-child > div > div.stVerticalBlock > div:has(> .st-key-sb_list) {
+        flex: 1 1 auto !important; min-height: 0 !important; overflow-y: auto !important;
+        display: flex !important; flex-direction: column !important; }
+    .st-key-sb_list { flex: 0 0 auto !important; overflow: visible !important; min-height: 0 !important;
+                      padding-top: .15rem; padding-right: .15rem; }
 
     /* session list rows */
-    .st-key-sb_list { padding-top: .15rem; }
     .st-key-sb_list [data-testid="stVerticalBlock"] { gap: .1rem; }
+    .st-key-sb_list .stHorizontalBlock { flex-wrap: nowrap !important; }
 
-    /* the row that is currently open */
-    .st-key-sb_active [data-testid="stVerticalBlock"] { }
+    /* session rows: title button + meta line */
+    .st-key-sb_list [data-testid="stVerticalBlock"] { gap: .12rem; }
+    .st-key-sb_list .stButton button { height: 32px; text-align: left; padding: .2rem .55rem;
+                                       font-size: .86rem; font-weight: 600; color: #1f2430;
+                                       border-radius: 6px; }
+    .st-key-sb_list .stButton button:hover { background: #f1f3f4; }
+    .st-key-sb_active .stButton button { background: #edf2fc; color: #1d4ed8; }
+    .st-key-sb_active .stButton button:hover { background: #e3ecfb; }
+    .st-key-sb_active .stButton button::before { content: "● "; color: #2563eb; font-weight: 700; }
+    .sb-meta { font-size: .72rem; color: #6b7280; line-height: 1.3; white-space: nowrap;
+               overflow: hidden; text-overflow: ellipsis; margin: .02rem 0 .15rem .55rem; }
 
-    /* open-session button styled as plain text */
-    [class*="st-key-sb_open"] button { border: none; background: transparent;
-                             box-shadow: none !important; text-align: left;
-                             padding: .15rem .4rem; width: 100%; min-height: 0;
-                             line-height: 1.3; border-radius: 6px; }
-    [class*="st-key-sb_open"] button:hover { background: #f1f3f4; }
-    .st-key-sb_active [class*="st-key-sb_open"] button { position: relative;
-        background: #edf2fc; }
-    .st-key-sb_active [class*="st-key-sb_open"] button:hover { background: #e3ecfb; }
-    .st-key-sb_active [class*="st-key-sb_open"] button::before { content: "● ";
-        color: #2563eb; font-weight: 700; }
-    .pr-title { display: block; font-weight: 600; color: #1f2430;
-                font-size: .86rem; white-space: nowrap;
-                overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
-    .pr-meta { display: block; color: #6b7280; font-size: .72rem;
-               white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-
-    /* compact action button */
-    [class*="st-key-sb_actions"] button { min-width: 0; width: 100%; height: 26px; padding: 0;
-                                border: none; background: transparent;
-                                box-shadow: none !important;
-                                display: flex; align-items: center;
-                                justify-content: center; }
-    [class*="st-key-sb_actions"] button:hover { background: #eceef1; }
-    [class*="st-key-sb_actions"] [data-testid="stIconMaterial"],
-    .st-key-sb_actions [data-testid="stIconMaterial"] { font-size: 1.15rem; }
+    /* compact ⋮ action trigger (icon-only popover button) */
+    .st-key-sb_list [data-testid="stPopover"] button { min-width: 28px; height: 28px; padding: 0;
+                                                       align-items: center; justify-content: center; }
+    .st-key-sb_list [data-testid="stPopover"] [data-testid="stIconMaterial"] { font-size: 1.15rem; }
 
     /* compact new-chat, search and subject */
     .st-key-sb_newchat button { height: 32px; border-radius: 8px; }
@@ -179,7 +185,7 @@ def start_session(user):
 def logout():
     db.set_current_user(None)
     st.session_state["auth_page"] = "login"
-    keep = {"auth_page", "api_key_input"}
+    keep = {"auth_page"}
     for key in list(st.session_state.keys()):
         if key not in keep:
             del st.session_state[key]
@@ -580,13 +586,17 @@ def render_section(conv_id, doc_id, sec, system_prompt, client, model, temperatu
                         st.warning("The model did not return a diagram. Try again.")
 
 
-api_key = nim.get_api_key()
+def _effective_api_key():
+    saved = str(_loaded_settings.get("api_key", "")).strip()
+    widget = str(st.session_state.get("set_api_key", saved)).strip()
+    return widget or nim.get_api_key()
+
+
+api_key = _effective_api_key()
 if not api_key:
-    with st.sidebar:
-        api_key = st.text_input("NVIDIA API key", type="password", placeholder="nvapi-...", key="api_key_input")
-    if not api_key:
-        st.info("Add your NVIDIA API key in `.env` or paste it in the sidebar, then refresh.")
-        st.stop()
+    st.info("The shared NVIDIA API key is not configured yet. Ask the administrator "
+            "to set `NVIDIA_API_KEY` in the server's `.env`.")
+    st.stop()
 
 client = _client(api_key)
 
@@ -674,50 +684,48 @@ with st.sidebar:
                 for c in items:
                     is_active = (st.session_state.current_conv == c["id"])
                     row_container = st.container(
-                        key="sb_active" if is_active else f"sb_{c['id']}", border=False
+                        key="sb_active" if is_active else f"sb_{c['id']}"
                     )
                     with row_container:
-                        row = st.container(horizontal=True, gap="small")
-                        with row:
-                            open_col, act_col = st.columns([6, 1], gap="small",
-                                                           vertical_alignment="center")
-                            with open_col:
-                                with st.container(key=f"sb_open_{c['id']}"):
-                                    if st.button(
-                                        f'<span class="pr-title">{html.escape(_session_title(c))}</span>'
-                                        f'<span class="pr-meta">{html.escape(_session_meta(c))}</span>',
-                                        key=f"sel_{c['id']}",
-                                        width="stretch",
-                                        type="tertiary",
-                                    ):
-                                        st.session_state.current_conv = c["id"]
-                                        st.session_state.viewing_doc = None
-                                        st.session_state.notes_active = None
-                                        st.session_state["prev_topic"] = None
-                            with act_col:
-                                with st.container(key=f"sb_actions_{c['id']}"):
-                                    with st.popover("", icon=":material/more_vert:",
-                                                    key=f"more_{c['id']}"):
-                                        if st.button("Pin" if not c["pinned"] else "Unpin",
-                                                     key=f"pin_{c['id']}"):
-                                            db.update_conversation(c["id"], pinned=not c["pinned"])
-                                            st.rerun()
-                                        if st.button("Duplicate", key=f"dup_{c['id']}"):
-                                            db.duplicate_conversation(c["id"])
-                                            st.rerun()
-                                        new_title = st.text_input("Rename to", value=c["title"],
-                                                                  key=f"rn_{c['id']}")
-                                        if st.button("Save rename", key=f"rns_{c['id']}"):
-                                            db.update_conversation(c["id"], title=new_title)
-                                            st.rerun()
-                                        if st.button("Delete", icon=":material/delete:",
-                                                     key=f"del_{c['id']}"):
-                                            if st.session_state.current_conv == c["id"]:
-                                                st.session_state.current_conv = None
-                                                st.session_state.viewing_doc = None
-                                                st.session_state.notes_active = None
-                                            db.delete_conversation(c["id"])
-                                            st.rerun()
+                        open_col, act_col = st.columns([6, 1], gap="small",
+                                                       vertical_alignment="center")
+                        if open_col.button(
+                            _session_title(c),
+                            key=f"sel_{c['id']}",
+                            width="stretch",
+                            type="primary" if is_active else "tertiary",
+                        ):
+                            st.session_state.current_conv = c["id"]
+                            st.session_state.viewing_doc = None
+                            st.session_state.notes_active = None
+                            st.session_state["prev_topic"] = None
+                            st.rerun()
+                        with act_col.popover("", icon=":material/more_vert:",
+                                             key=f"more_{c['id']}"):
+                            if st.button("Pin" if not c["pinned"] else "Unpin",
+                                         key=f"pin_{c['id']}"):
+                                db.update_conversation(c["id"], pinned=not c["pinned"])
+                                st.rerun()
+                            if st.button("Duplicate", key=f"dup_{c['id']}"):
+                                db.duplicate_conversation(c["id"])
+                                st.rerun()
+                            new_title = st.text_input("Rename to", value=c["title"],
+                                                      key=f"rn_{c['id']}")
+                            if st.button("Save rename", key=f"rns_{c['id']}"):
+                                db.update_conversation(c["id"], title=new_title)
+                                st.rerun()
+                            if st.button("Delete", icon=":material/delete:",
+                                         key=f"del_{c['id']}"):
+                                if st.session_state.current_conv == c["id"]:
+                                    st.session_state.current_conv = None
+                                    st.session_state.viewing_doc = None
+                                    st.session_state.notes_active = None
+                                db.delete_conversation(c["id"])
+                                st.rerun()
+                        st.markdown(
+                            f'<div class="sb-meta">{html.escape(_session_meta(c))}</div>',
+                            unsafe_allow_html=True,
+                        )
 
     # ---- FIXED ACCOUNT FOOTER ----
     with st.container(key="sb_bottom"):
@@ -739,6 +747,19 @@ with st.sidebar:
             st.session_state.panel_h = st.slider("Panel height (px)", 440, 900,
                                                  panel_h, 20, key="set_ph",
                                                  help="Height of the chat and notes scroll areas.")
+            st.divider()
+            st.caption("API key (optional)")
+            _own_key = str(_loaded_settings.get("api_key", "")).strip()
+            st.text_input(
+                "Your NVIDIA API key",
+                value=_own_key,
+                placeholder="nvapi-…",
+                type="password",
+                key="set_api_key",
+                help="Leave empty to use the shared workspace key. If you add your own key, "
+                     "your responses will use it instead.",
+            )
+            st.caption(("Using: your own key." if _own_key else "Using: shared workspace key."))
         with st.popover("Account", icon=":material/account_circle:", key="account_pop"):
             st.markdown(f"**{html.escape(st.session_state.get('user_name', 'User'))}**")
             st.caption(st.session_state.get("user_email", ""))
@@ -757,6 +778,7 @@ with st.sidebar:
         "notes_width": st.session_state.get("notes_width", 38),
         "notes_visible": st.session_state.get("notes_visible", True),
         "panel_h": st.session_state.get("panel_h", DEFAULT_PANEL_H),
+        "api_key": str(st.session_state.get("set_api_key", "")).strip(),
     })
 
 conv_id = st.session_state.current_conv
