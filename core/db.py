@@ -105,6 +105,25 @@ CREATE TABLE IF NOT EXISTS user_settings (
     updated_at TEXT NOT NULL,
     PRIMARY KEY (user_id, key)
 );
+
+CREATE TABLE IF NOT EXISTS knowledge_nodes (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    conversation_id INTEGER NOT NULL REFERENCES conversations(id) ON DELETE CASCADE,
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    section_id INTEGER REFERENCES note_sections(id) ON DELETE SET NULL,
+    message_id INTEGER REFERENCES messages(id) ON DELETE SET NULL,
+    title TEXT NOT NULL,
+    summary TEXT DEFAULT '',
+    content TEXT DEFAULT '',
+    x REAL DEFAULT 0,
+    y REAL DEFAULT 0,
+    collapsed INTEGER DEFAULT 0,
+    parent_id INTEGER REFERENCES knowledge_nodes(id) ON DELETE SET NULL,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_kn_conv ON knowledge_nodes(conversation_id);
+CREATE INDEX IF NOT EXISTS idx_kn_user ON knowledge_nodes(user_id);
 """
 
 _lock = threading.Lock()
@@ -398,7 +417,9 @@ def list_conversations():
         SELECT c.*, COUNT(m.id) AS message_count,
                (SELECT COUNT(*) FROM note_sections s
                 JOIN note_documents d ON s.document_id = d.id
-                WHERE d.conversation_id = c.id AND d.user_id = c.user_id) AS section_count
+                WHERE d.conversation_id = c.id AND d.user_id = c.user_id) AS section_count,
+               (SELECT COUNT(*) FROM knowledge_nodes k
+                WHERE k.conversation_id = c.id AND k.user_id = c.user_id) AS knowledge_count
         FROM conversations c
         LEFT JOIN messages m ON m.conversation_id = c.id AND m.user_id = c.user_id
         WHERE c.user_id = ?
@@ -635,6 +656,86 @@ def delete_image(image_id):
 
 
 # ----------------------------------------------------------------------------
+# Knowledge nodes
+# ----------------------------------------------------------------------------
+
+def create_knowledge_node(conv_id, title, summary="", content="", section_id=None,
+                          message_id=None, parent_id=None, x=0.0, y=0.0):
+    uid = _uid()
+    owner = query_one("SELECT id FROM conversations WHERE id = ? AND user_id = ?", (conv_id, uid))
+    if not owner:
+        raise PermissionError("Conversation belongs to another user.")
+    now = _now()
+    cur = execute(
+        """INSERT INTO knowledge_nodes
+           (conversation_id, user_id, section_id, message_id, title, summary, content,
+            x, y, collapsed, parent_id, created_at, updated_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?)""",
+        (conv_id, uid, section_id, message_id, title, summary, content, x, y, parent_id, now, now),
+    )
+    touch_conversation(conv_id)
+    return cur.lastrowid
+
+
+def get_knowledge_node(node_id):
+    uid = current_user_id()
+    if not uid:
+        return None
+    return query_one("SELECT * FROM knowledge_nodes WHERE id = ? AND user_id = ?", (node_id, uid))
+
+
+def get_conversation_nodes(conv_id):
+    uid = current_user_id()
+    if not uid:
+        return []
+    return query_all(
+        "SELECT * FROM knowledge_nodes WHERE conversation_id = ? AND user_id = ? ORDER BY id",
+        (conv_id, uid),
+    )
+
+
+def update_knowledge_node(node_id, **kwargs):
+    uid = _uid()
+    allowed = {"title", "summary", "content", "x", "y", "collapsed", "parent_id",
+               "section_id", "message_id"}
+    sets = []
+    params = []
+    for key, value in kwargs.items():
+        if key not in allowed:
+            continue
+        sets.append(f"{key} = ?")
+        params.append(value)
+    if not sets:
+        return
+    sets.append("updated_at = ?")
+    params.append(_now())
+    params.append(node_id)
+    params.append(uid)
+    execute(f"UPDATE knowledge_nodes SET {', '.join(sets)} WHERE id = ? AND user_id = ?", params)
+
+
+def update_knowledge_node_position(node_id, x, y):
+    update_knowledge_node(node_id, x=x, y=y)
+
+
+def delete_knowledge_node(node_id):
+    uid = _uid()
+    execute("DELETE FROM knowledge_nodes WHERE id = ? AND user_id = ?", (node_id, uid))
+
+
+def next_node_position(conv_id):
+    """Auto-place the next knowledge card in a 4-wide grid (canvas coords)."""
+    uid = current_user_id()
+    if not uid:
+        return (80.0, 60.0)
+    count = query_one(
+        "SELECT COUNT(*) AS n FROM knowledge_nodes WHERE conversation_id = ? AND user_id = ?",
+        (conv_id, uid),
+    )["n"]
+    return (80 + (count % 4) * 220, 60 + (count // 4) * 150)
+
+
+# ----------------------------------------------------------------------------
 # Search
 # ----------------------------------------------------------------------------
 
@@ -669,6 +770,52 @@ def search_conversation(conv_id, term):
         (conv_id, uid, like, like),
     )
     return {"messages": messages, "sections": sections, "doubts": doubts}
+
+
+def search_user_contents(term):
+    """Global search across all of the current user's conversations."""
+    uid = current_user_id()
+    if not uid:
+        return []
+    like = f"%{term}%"
+    convs = query_all(
+        """SELECT DISTINCT c.id, c.title, c.updated_at FROM conversations c
+           WHERE c.user_id = ? AND (
+             c.title LIKE ?
+             OR EXISTS (SELECT 1 FROM messages m
+                        WHERE m.conversation_id = c.id AND m.user_id = c.user_id
+                          AND m.content LIKE ?)
+             OR EXISTS (SELECT 1 FROM note_sections s JOIN note_documents d ON s.document_id = d.id
+                        WHERE d.conversation_id = c.id AND d.user_id = c.user_id
+                          AND (s.heading LIKE ? OR s.content LIKE ?))
+             OR EXISTS (SELECT 1 FROM doubts d
+                        WHERE d.conversation_id = c.id AND d.user_id = c.user_id
+                          AND (d.question LIKE ? OR d.answer LIKE ?))
+           ) ORDER BY c.updated_at DESC LIMIT 8""",
+        (uid, like, like, like, like, like, like),
+    )
+    out = []
+    for c in convs:
+        messages = query_all(
+            "SELECT id, role, content FROM messages WHERE conversation_id = ? AND user_id = ? "
+            "AND content LIKE ? ORDER BY id DESC LIMIT 3",
+            (c["id"], uid, like),
+        )
+        sections = query_all(
+            """SELECT s.id, s.node_id, s.heading, s.content
+               FROM note_sections s JOIN note_documents d ON s.document_id = d.id
+               WHERE d.conversation_id = ? AND s.user_id = ? AND d.user_id = ?
+                 AND (s.heading LIKE ? OR s.content LIKE ?)
+               ORDER BY s.id DESC LIMIT 3""",
+            (c["id"], uid, uid, like, like),
+        )
+        doubts = query_all(
+            "SELECT id, question, answer, node_id FROM doubts WHERE conversation_id = ? "
+            "AND user_id = ? AND (question LIKE ? OR answer LIKE ?) ORDER BY id DESC LIMIT 3",
+            (c["id"], uid, like, like),
+        )
+        out.append({"conversation": c, "messages": messages, "sections": sections, "doubts": doubts})
+    return out
 
 
 # ----------------------------------------------------------------------------

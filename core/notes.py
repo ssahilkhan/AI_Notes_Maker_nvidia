@@ -17,6 +17,16 @@ def detect_kind(heading, content=""):
         return "limitation"
     if "application" in h or "use case" in h or "use-cases" in h:
         return "application"
+    if "flowchart" in h or "diagram" in h or "pipeline" in h or "architecture" in h or "process" in h:
+        return "flowchart"
+    if "comparison" in h or "vs" in h or "versus" in h or "compare" in h or "difference" in h:
+        return "comparison"
+    if "step" in h or "procedure" in h or "algorithm" in h or "how to" in h or "workflow" in h:
+        return "step"
+    if "table" in h or "summary table" in h:
+        return "table"
+    if "|" in content and re.search(r"\|\s*[-:]+", content):
+        return "table"
     if ("takeaway" in h or "important" in h or "key point" in h or "must know" in h
             or "memory trick" in h or "conclusion" in h or "summary" in h):
         return "important"

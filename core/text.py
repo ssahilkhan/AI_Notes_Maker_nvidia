@@ -67,6 +67,10 @@ KIND_BADGE = {
     "application": "AP",
     "important": "K",
     "text": "T",
+    "flowchart": "FC",
+    "comparison": "C",
+    "table": "TB",
+    "step": "S",
 }
 
 KIND_LABEL = {
@@ -78,6 +82,10 @@ KIND_LABEL = {
     "application": "Application",
     "important": "Key concept",
     "text": "Note",
+    "flowchart": "Flowchart",
+    "comparison": "Comparison",
+    "table": "Table",
+    "step": "Step-by-step",
 }
 
 KIND_COLOR = {
@@ -89,6 +97,10 @@ KIND_COLOR = {
     "application": "cyan",
     "important": "amber",
     "text": "gray",
+    "flowchart": "cyan",
+    "comparison": "amber",
+    "table": "teal",
+    "step": "green",
 }
 
 
@@ -100,6 +112,11 @@ def _snippet(text, term, width=70):
     start = max(0, idx - 20)
     end = min(len(text), idx + width)
     return ("…" if start else "") + text[start:end] + ("…" if end < len(text) else "")
+
+
+def glimpse(text, term, width=70):
+    """Public snippet helper used by the global search results."""
+    return _snippet(text, term, width)
 
 
 def rail_html(sections, active=None):

@@ -29,6 +29,23 @@ FORMATTING RULES (very important):
 - Never put more than one ## heading inside the same block.
 - Do not use level-1 headings (# ) in answers.
 
+FORMAT CHOICE (adopt whichever best clarifies the topic; combine freely):
+- ```mermaid flowchart``` (fenced code block) for processes, architectures, pipelines, algorithms, and mechanisms.
+- Markdown tables for comparisons, taxonomies, complexity, and component lists.
+- Numbered steps for procedures, derivations, or how-it-works explanations.
+- A short real-world analogy when it builds intuition.
+
+OPTIONAL TAIL SECTIONS (use only when relevant):
+- "### Exam Tip" — the most probable exam question(s) on this topic and a hint on how to answer.
+- "### Key Insight" — one bold, single-sentence takeaway.
+
+MANDATORY FINAL SECTION — ALWAYS end the answer with exactly this as the last content:
+### Related Concepts
+- Concept name 1
+- Concept name 2
+
+List 3-7 short core concept names (plain text, no definitions and no markdown formatting) that a student could turn into knowledge cards.
+
 Always maintain the conversation's academic context and answer follow-up questions in the same subject and style."""
 
 EXAM_ANSWER_PROMPT = """Convert the topic below into an exam answer worth {marks} marks.
