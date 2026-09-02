@@ -14,6 +14,8 @@ def build_messages(db, conv_id, user_question, *, system_prompt=None, extra_cont
     memory_block = build_memory_block(db, conv_id)
     if memory_block:
         system = system + "\n\nSTUDY SESSION MEMORY (context only, do not repeat it unless asked):\n" + memory_block
+    if extra_context:
+        system = system + "\n\nACTIVE GRAPH CONTEXT (the student selected a knowledge node — use this to focus your answer):\n" + extra_context
     messages.append({"role": "system", "content": system})
 
     recent = db.get_messages(conv_id, limit=RECENT_MESSAGE_LIMIT * 2)

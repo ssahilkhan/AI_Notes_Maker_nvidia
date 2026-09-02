@@ -16,11 +16,18 @@ def render_footer(ctx, uid, loaded_settings):
     execute, so after this returns the widget values live in session_state
     and are written back into ``ctx``.
     """
-    with st.container(horizontal=True):
-        if st.button("🗺 Knowledge map", icon=":material/mindfulness:", key="kn_open",
+    name = st.session_state.get("user_name", "User")
+    email = st.session_state.get("user_email", "")
+    initial = (name[:1] or "?").upper()
+
+    # ---- Knowledge map quick action + Settings row ----
+    with st.container(horizontal=True, key="sb_actions"):
+        if st.button("Knowledge Map", icon=":material/mindfulness:", key="kn_open",
                      help="Open the interactive knowledge map for the current session"):
             st.session_state["canvas_mode"] = "split"
             st.rerun()
+
+    # ---- Settings popover ----
     with st.popover("Settings", icon=":material/tune:", key="settings_pop"):
         _model_ix = nim.NEMOTRON_MODELS.index(ctx.model) if ctx.model in nim.NEMOTRON_MODELS else 0
         model = st.selectbox("Model", nim.NEMOTRON_MODELS, index=_model_ix, key="set_model")
@@ -33,6 +40,7 @@ def render_footer(ctx, uid, loaded_settings):
         max_tokens = st.slider("Max tokens", 256, 8192, ctx.max_tokens, 256, key="set_tokens")
         system_prompt = st.text_area("System prompt", value=ctx.system_prompt, height=180,
                                      key="set_system")
+        st.divider()
         st.caption("Workspace")
         st.session_state.notes_width = st.slider(
             "Notes panel width (%)", 28, 60, ctx.notes_width, 2, key="set_nw",
@@ -48,7 +56,7 @@ def render_footer(ctx, uid, loaded_settings):
         st.text_input(
             "Your NVIDIA API key",
             value=_own_key,
-            placeholder="nvapi-…",
+            placeholder="nvapi-...",
             type="password",
             key="set_api_key",
             help="Leave empty to use the shared workspace key. If you add your own key, "
@@ -56,10 +64,8 @@ def render_footer(ctx, uid, loaded_settings):
         )
         st.caption(("Using: your own key." if _own_key else "Using: shared workspace key."))
 
-    with st.popover("Account", icon=":material/account_circle:", key="account_pop"):
-        name = st.session_state.get("user_name", "User")
-        email = st.session_state.get("user_email", "")
-        initial = (name[:1] or "?").upper()
+    # ---- Account popover ----
+    with st.popover("", icon=":material/account_circle:", key="account_pop"):
         st.markdown(
             f'<div class="sb-account-row">'
             f'<span class="sb-avatar">{html.escape(initial)}</span>'
@@ -67,6 +73,13 @@ def render_footer(ctx, uid, loaded_settings):
             f'<span class="sb-account-email">{html.escape(email)}</span></span></div>',
             unsafe_allow_html=True,
         )
+        st.divider()
+        if st.button("Account Settings", icon=":material/settings:", key="acct_settings",
+                     help="Open account settings"):
+            st.toast("Account settings coming soon.")
+        if st.button("Preferences", icon=":material/tune:", key="acct_prefs",
+                     help="Open preferences"):
+            st.toast("Preferences panel coming soon.")
         st.divider()
         if st.button("Logout", icon=":material/logout:", key="logout_btn"):
             layout.logout()

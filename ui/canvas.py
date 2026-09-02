@@ -49,6 +49,29 @@ def _apply_draft(conv_id, data):
             pass
 
 
+def _build_node_context(conv_id, node):
+    """Build a focused graph-context block for the AI when the user asks about
+    a selected knowledge node: its summary + parent + children + siblings."""
+    if not node:
+        return ""
+    nodes = db.get_conversation_nodes(conv_id)
+    by_id = {n["id"]: n for n in nodes}
+    parts = [f"Selected node: {node['title']}"]
+    if node["summary"]:
+        parts.append(f"Summary: {node['summary'][:300]}")
+    parent = by_id.get(node["parent_id"])
+    if parent:
+        parts.append(f"Parent node: {parent['title']}")
+    children = [n for n in nodes if n["parent_id"] == node["id"]]
+    if children:
+        parts.append(f"Child nodes: {', '.join(c['title'] for c in children)}")
+    siblings = [n for n in nodes
+                if n["parent_id"] == node["parent_id"] and n["id"] != node["id"]]
+    if siblings:
+        parts.append(f"Related nodes: {', '.join(s['title'] for s in siblings)}")
+    return " | ".join(parts)
+
+
 def _process_draft(conv_id):
     """Read + clear the hidden bridge widget, then persist canvas edits."""
     if conv_id is None:
@@ -64,6 +87,8 @@ def _process_draft(conv_id):
         nid = next(iter(ask), None)
         node = db.get_knowledge_node(nid) if nid else None
         if node:
+            st.session_state["graph_context"] = _build_node_context(conv_id, node)
+            st.session_state["active_node_id"] = nid
             st.session_state["chat_input_main"] = (
                 f"Explain “{node['title']}” in the context of this session "
                 f"(following my knowledge card)."
@@ -96,11 +121,21 @@ def _card_html(n, nodes_by_id):
     )
 
 
-def _canvas_html(nodes):
+def _canvas_html(nodes, focus_id=None):
     if not nodes:
         return ""
     parents = [(n["parent_id"], n["id"]) for n in nodes if n["parent_id"]]
     card_html = "".join(_card_html(n, {k["id"] for k in nodes}) for n in nodes)
+    focus_js = ""
+    if focus_id:
+        focus_js = (
+            "  const fc = document.querySelector('.kn-card[data-id=\"" + str(focus_id) + "\"]');\n"
+            "  if (fc) {\n"
+            "    const fx = +fc.dataset.x + CARD_W/2, fy = +fc.dataset.y + CARD_H/2;\n"
+            "    state.tx = innerWidth/2 - fx; state.ty = innerHeight/2 - fy;\n"
+            "    fc.classList.add('selected');\n"
+            "  }\n"
+        )
     return f"""<!DOCTYPE html>
 <html><head><meta charset="utf-8"><style>
 * {{ margin:0; padding:0; box-sizing:border-box; }}
@@ -297,8 +332,9 @@ html,body {{ width:100%; height:100%; overflow:hidden; background:#f1f4fb; font-
     const rect = document.getElementById('wrap').getBoundingClientRect();
     zoomAt(e.clientX - rect.left, e.clientY - rect.top,
            Math.min(2.5, Math.max(0.3, state.k * (e.deltaY < 0 ? 1.15 : 0.87))));
-  }}, {{ passive: false }});
+}}, {{ passive: false }});
 
+  {focus_js}
   applyTransform();
   drawWires();
 }})();
@@ -325,6 +361,9 @@ def render_canvas(conv_id):
         return
 
     nodes = db.get_conversation_nodes(conv_id)
+    focus_id = st.session_state.pop("focus_node_id", None)
+    if focus_id is not None and not any(n["id"] == focus_id for n in nodes):
+        focus_id = None
 
     head = st.container(border=True)
     with head:
@@ -358,4 +397,4 @@ def render_canvas(conv_id):
         return
 
     st.text_input("", label_visibility="collapsed", key=DRAFT_KEY, value="", placeholder="")
-    components.html(_canvas_html(nodes), height=CANVAS_H, scrolling=False)
+    components.html(_canvas_html(nodes, focus_id), height=CANVAS_H, scrolling=False)

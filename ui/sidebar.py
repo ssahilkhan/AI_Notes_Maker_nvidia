@@ -13,13 +13,13 @@ from ui.context import ctx
 
 def _session_time(ts):
     """Compact timestamp: '13:09' today, 'Mon' yesterday-ish, else '30 Aug'."""
-    from datetime import datetime
+    from datetime import datetime, timezone
 
     try:
         dt = datetime.fromisoformat(ts)
     except (TypeError, ValueError):
         return ""
-    now = datetime.now()
+    now = datetime.now(timezone.utc).replace(tzinfo=None)
     today = now.replace(hour=0, minute=0, second=0, microsecond=0)
     day = dt.replace(hour=0, minute=0, second=0, microsecond=0)
     if day == today:
@@ -131,7 +131,12 @@ def render_sidebar(uid, loaded_settings):
     with st.sidebar:
         # ---- FIXED HEADER ----
         with st.container(key="sb_top"):
-            st.header("Study Sessions", help=None)
+            st.markdown(
+                '<div style="padding:.15rem 0 .3rem .15rem">'
+                '<span style="font-size:1.05rem;font-weight:700;color:#1f2430">Study Workspace</span>'
+                '</div>',
+                unsafe_allow_html=True,
+            )
             with st.container(key="sb_newchat"):
                 if st.button("＋  New chat", icon=":material/add_circle:", key="new_chat_top",
                              width="stretch", use_container_width=True):
@@ -143,7 +148,7 @@ def render_sidebar(uid, loaded_settings):
             with st.container(key="sb_search"):
                 sc, cc = st.columns([11, 1], gap="small", vertical_alignment="center")
                 with sc:
-                    search = st.text_input("Search sessions…", placeholder="Search sessions…",
+                    search = st.text_input("Search chats…", placeholder="Search chats…",
                                            label_visibility="collapsed", key="search_chats")
                 with cc:
                     if st.button("", icon=":material/close:", key="search_clr", type="tertiary",
@@ -161,5 +166,4 @@ def render_sidebar(uid, loaded_settings):
 
         # ---- FIXED ACCOUNT FOOTER ----
         with st.container(key="sb_bottom"):
-            st.divider()
             components.render_footer(ctx, uid, loaded_settings)

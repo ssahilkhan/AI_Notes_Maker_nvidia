@@ -147,6 +147,22 @@ def render_concept_chips(concepts, conv_id=None, message_id=None):
         col_idx += 1
 
 
+def _infer_parent(conv_id, name, message_id=None):
+    """Pick a sensible parent for a new concept node.
+
+    Links the new node to the most recent existing node in the conversation
+    (a learning chain). Later phases improve this with AI relationship
+    inference between concepts.
+    """
+    existing = db.get_conversation_nodes(conv_id)
+    if not existing:
+        return None
+    for node in reversed(existing):
+        if node["title"].strip().lower() != (name or "").strip().lower():
+            return node["id"]
+    return None
+
+
 def _create_node_from_chip(conv_id, name, message_id):
     if not conv_id:
         return
@@ -156,6 +172,7 @@ def _create_node_from_chip(conv_id, name, message_id):
         name,
         summary="Concept extracted from the study session.",
         message_id=message_id,
+        parent_id=_infer_parent(conv_id, name, message_id),
         x=x,
         y=y,
     )
@@ -265,7 +282,12 @@ def render_chat_main(ctx, conv_id):
         if messages and messages[-1]["role"] == "user":
             with st.chat_message("assistant", avatar=":material/school:"):
                 st.markdown(f'<div id="msg-{messages[-1]["id"] + 1}"></div>', unsafe_allow_html=True)
-                full_messages = memory.build_messages(db, conv_id, None, system_prompt=ctx.system_prompt)
+                graph_ctx = st.session_state.get("graph_context", "")
+                full_messages = memory.build_messages(
+                    db, conv_id, None,
+                    system_prompt=ctx.system_prompt,
+                    extra_context=graph_ctx or None,
+                )
                 answer_text, error = stream_and_answer(ctx, full_messages)
                 msg_id = None
                 if answer_text and ctx.verify_answers:
@@ -282,6 +304,8 @@ def render_chat_main(ctx, conv_id):
                         answer_text = answer_text + "\n\n---\n**Verification:** " + verdict
                 if answer_text:
                     msg_id = db.add_message(conv_id, "assistant", answer_text)
+                    st.session_state.pop("graph_context", None)
+                    st.session_state.pop("active_node_id", None)
                 elif error:
                     st.error(f"The AI request failed: {error}")
                     if st.button("Retry", icon=":material/refresh:", key=f"retry_{conv_id}",

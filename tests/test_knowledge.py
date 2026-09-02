@@ -10,6 +10,7 @@ from streamlit.testing.v1 import AppTest
 
 import core.db as db
 import ui.canvas as canvas
+import ui.chat as chat
 
 _TEST_DB = os.path.join(tempfile.mkdtemp(prefix="study_kn_test_"), "test.db")
 os.environ["STUDY_DB_PATH"] = _TEST_DB
@@ -115,6 +116,29 @@ class TestKnowledgeNodeCrud:
         db.create_knowledge_node(conv, "B")
         rows = [c for c in db.list_conversations() if c["id"] == conv]
         assert rows and rows[0]["knowledge_count"] == 2
+
+    def test_infer_parent_chains_new_nodes(self):
+        _make_user()
+        conv = db.create_conversation()
+        first = db.create_knowledge_node(conv, "Neural Networks")
+        second = db.create_knowledge_node(conv, "Input Layer")
+        parent = chat._infer_parent(conv, "Hidden Layer")
+        assert parent == second  # most recent node becomes the parent
+        hid = db.create_knowledge_node(conv, "Hidden Layer", parent_id=parent)
+        assert db.get_knowledge_node(hid)["parent_id"] == second
+
+    def test_infer_parent_returns_none_when_no_nodes(self):
+        _make_user()
+        conv = db.create_conversation()
+        assert chat._infer_parent(conv, "Anything") is None
+
+    def test_infer_parent_skips_same_name(self):
+        _make_user()
+        conv = db.create_conversation()
+        a = db.create_knowledge_node(conv, "Backpropagation")
+        db.create_knowledge_node(conv, "Loss Function")
+        parent = chat._infer_parent(conv, "Backpropagation")
+        assert parent is not None and parent != a
 
 
 class TestChipCreatesCard:

@@ -86,6 +86,26 @@ class TestSearchDb:
         rows = db.search_user_contents("neural")
         assert [r["conversation"]["id"] for r in rows] == [conv]
 
+    def test_finds_knowledge_nodes(self):
+        db.create_user("F", "f@test.dev", "hash")
+        db.set_current_user(db.find_user_by_email("f@test.dev")["id"])
+        conv = db.create_conversation()
+        db.create_knowledge_node(conv, "Backpropagation", summary="Chain rule for error gradients.")
+        rows = db.search_user_contents("backpropagation")
+        assert [r["conversation"]["id"] for r in rows] == [conv]
+        hit = next(r for r in rows if r["conversation"]["id"] == conv)
+        assert [n["title"] for n in hit["nodes"]] == ["Backpropagation"]
+
+    def test_finds_knowledge_nodes_via_summary(self):
+        db.create_user("G", "g@test.dev", "hash")
+        db.set_current_user(db.find_user_by_email("g@test.dev")["id"])
+        conv = db.create_conversation()
+        db.create_knowledge_node(conv, "Activation", summary="ReLU and sigmoid functions.")
+        rows = db.search_user_contents("sigmoid")
+        assert any(n["title"] == "Activation"
+                   for r in rows if r["conversation"]["id"] == conv
+                   for n in r["nodes"])
+
 
 class TestGlimpse:
     def test_snippet_wraps_term(self):

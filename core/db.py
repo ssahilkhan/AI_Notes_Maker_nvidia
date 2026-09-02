@@ -2,7 +2,7 @@ import json
 import os
 import sqlite3
 import threading
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 DEFAULT_DB_PATH = Path(__file__).resolve().parent.parent / "data" / "study.db"
@@ -133,7 +133,7 @@ _local = threading.local()
 
 
 def _now():
-    return datetime.utcnow().isoformat(timespec="seconds")
+    return datetime.now(timezone.utc).replace(tzinfo=None).isoformat(timespec="seconds")
 
 
 def _db_path():
@@ -791,8 +791,11 @@ def search_user_contents(term):
              OR EXISTS (SELECT 1 FROM doubts d
                         WHERE d.conversation_id = c.id AND d.user_id = c.user_id
                           AND (d.question LIKE ? OR d.answer LIKE ?))
+             OR EXISTS (SELECT 1 FROM knowledge_nodes k
+                        WHERE k.conversation_id = c.id AND k.user_id = c.user_id
+                          AND (k.title LIKE ? OR k.summary LIKE ? OR k.content LIKE ?))
            ) ORDER BY c.updated_at DESC LIMIT 8""",
-        (uid, like, like, like, like, like, like),
+        (uid, like, like, like, like, like, like, like, like, like),
     )
     out = []
     for c in convs:
@@ -814,7 +817,14 @@ def search_user_contents(term):
             "AND user_id = ? AND (question LIKE ? OR answer LIKE ?) ORDER BY id DESC LIMIT 3",
             (c["id"], uid, like, like),
         )
-        out.append({"conversation": c, "messages": messages, "sections": sections, "doubts": doubts})
+        nodes = query_all(
+            "SELECT id, title, summary FROM knowledge_nodes WHERE conversation_id = ? "
+            "AND user_id = ? AND (title LIKE ? OR summary LIKE ? OR content LIKE ?) "
+            "ORDER BY id DESC LIMIT 3",
+            (c["id"], uid, like, like, like),
+        )
+        out.append({"conversation": c, "messages": messages, "sections": sections,
+                    "doubts": doubts, "nodes": nodes})
     return out
 
 
@@ -824,7 +834,7 @@ def search_user_contents(term):
 
 def group_key(created_at):
     dt = datetime.fromisoformat(created_at)
-    now = datetime.now()
+    now = datetime.now(timezone.utc).replace(tzinfo=None)
     today = now.replace(hour=0, minute=0, second=0, microsecond=0)
     if dt >= today:
         return "Today"

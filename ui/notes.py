@@ -66,6 +66,7 @@ def render_section(conv_id, doc_id, sec):
                 content=sec["content"],
                 section_id=sec["id"],
                 message_id=sec["message_id"],
+                parent_id=chat._infer_parent(conv_id, sec["heading"] or "Knowledge card", sec["message_id"]),
                 x=x,
                 y=y,
             )
@@ -391,7 +392,7 @@ def render_notes_panel(conv_id, notes_c, main_c):
         if kn:
             st.caption(
                 f"🗺 **{len(kn)}** knowledge card{'s' if len(kn) != 1 else ''} — "
-                "the interactive map arrives in the next update."
+                "use the sidebar's **Knowledge Map** button to open the interactive map."
             )
 
         viewing = st.selectbox("Doc", doc_ids, index=index, format_func=lambda i: doc_labels[i],

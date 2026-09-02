@@ -24,7 +24,7 @@ def render_global_search(conv_id):
     """Render the search popover. ``conv_id`` is the currently open session."""
     with st.popover("Search everything (Ctrl+K)", icon=":material/search:",
                     key="global_search"):
-        st.caption("Search chat + notes + doubts across all your study sessions.")
+        st.caption("Search chat + notes + knowledge nodes + doubts across all your study sessions.")
         term = st.text_input(
             "Search everything", key="global_search_term",
             placeholder="e.g. gradient descent", label_visibility="collapsed",
@@ -33,7 +33,7 @@ def render_global_search(conv_id):
         if not term:
             return
         results = db.search_user_contents(term)
-        found = any(r["messages"] or r["sections"] or r["doubts"] for r in results)
+        found = any(r["messages"] or r["sections"] or r["doubts"] or r["nodes"] for r in results)
         if not found:
             st.caption("No matches across your sessions.")
             return
@@ -50,6 +50,15 @@ def render_global_search(conv_id):
                     label = txt.glimpse(s["heading"] or s["content"], term, 60)
                     if st.button(f"📝 {label}", key=f"gss_{c['id']}_{s['id']}"):
                         _jump(c["id"], f"sec-{s['node_id']}", node_id=s["node_id"])
+                for n in res["nodes"]:
+                    label = txt.glimpse(n["title"], term, 60)
+                    if st.button(f"◉ {label}",
+                                 key=f"gsn_{c['id']}_{n['id']}"):
+                        st.session_state["current_conv"] = c["id"]
+                        st.session_state["viewing_doc"] = None
+                        st.session_state["notes_active"] = None
+                        st.session_state["focus_node_id"] = n["id"]
+                        st.session_state["canvas_mode"] = "split"
                 for d in res["doubts"]:
                     label = "Q: " + txt.glimpse(d["question"], term, 50)
                     if st.button(f"❓ {label}", key=f"gsd_{c['id']}_{d['id']}"):
