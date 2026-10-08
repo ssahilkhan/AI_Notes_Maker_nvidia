@@ -128,6 +128,36 @@ pytest
 The suite covers authentication, per-user data isolation, global search, knowledge-map
 persistence and the main UI flows, using a throwaway database.
 
+### Deploy on Streamlit Community Cloud (free)
+
+This project is a long-running Streamlit server (WebSocket session protocol + SQLite on
+disk), so it needs a host that runs persistent processes — serverless platforms such as
+**Vercel cannot run it** (its Python runtime only loads ASGI/WSGI apps, and its functions
+are stateless with ephemeral storage). Streamlit Community Cloud deploys straight from
+this repository:
+
+1. Go to [share.streamlit.io](https://share.streamlit.io) and sign in with GitHub.
+2. Click **Create app** → *Deploy an existing app* → select
+   `ssahilkhan/AI_Notes_Maker_nvidia`, branch `main`, entrypoint `streamlit_app.py`.
+3. Open **Advanced settings → Secrets** and paste your NVIDIA API key:
+
+   ```toml
+   NVIDIA_API_KEY = "nvapi-YOUR_KEY_HERE"
+   ```
+
+   The app reads it through `st.secrets` (see `core/nim.py`); locally it falls back to
+   your `.env` file.
+4. Click **Deploy** — Community Cloud installs `requirements.txt` automatically and the
+   first build takes a few minutes.
+
+> **Data note:** `data/study.db` (accounts, sessions, notes) and `data/uploads/` live on
+> the app container's local disk, which is not backed up and may be reset on reboot or
+> redeploy. That's fine for a demo/portfolio app; for durable data, point `STUDY_DB_PATH`
+> at a hosted database or migrate `core/db.py` to a managed SQL service.
+
+> **After switching hosts:** delete or disconnect the failed Vercel project so it stops
+> attempting builds on every push.
+
 ### Dev Container / Codespaces
 
 The repo ships with a `.devcontainer` config: opening it in VS Code or GitHub Codespaces
